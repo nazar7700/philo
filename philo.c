@@ -21,8 +21,7 @@
 #include "random.h"
 
 #define NUM_PHILO 5
-int chopsticks[NUM_PHILO];
-
+int chopsticks;
 
 void EatOrThink(int i, pid_t pid){
 
@@ -33,7 +32,7 @@ void EatOrThink(int i, pid_t pid){
 
     while(time_eating < 100){
 
-        int time_to_think = randomGaussian(5, 3); // 11 , 7
+        int time_to_think = randomGaussian(11, 7); // 11 , 7
         if (time_to_think < 0){
             time_to_think = 0;
         }
@@ -47,7 +46,7 @@ void EatOrThink(int i, pid_t pid){
 
         printf("Philosopher %i checking for chopsticks %i and %i\n",
             i,left,right );
-
+        // Pretty sure everything after this point is incorrect !!!!!!!!!!!!!
         struct sembuf take[2];
         take[0].sem_num = left;
         take[0].sem_op = -1;
@@ -55,6 +54,7 @@ void EatOrThink(int i, pid_t pid){
         take[1].sem_num = right;
         take[1].sem_op = -1;
         take[1].sem_flg = 0;
+
         struct sembuf drop[2];
         drop[0].sem_num = left;
         drop[0].sem_op = 1;
@@ -64,8 +64,9 @@ void EatOrThink(int i, pid_t pid){
         drop[1].sem_flg = 0;        
 
         int time_to_eat = 0;
-        semop(chopsticks[0], drop, 2);
-        while((semop(chopsticks[0], take , 2) == -1)){
+
+        if (semop(chopsticks, take, 2) == 0) {
+
             time_to_eat = randomGaussian(9, 3); // 9 , 3
             if (time_to_eat < 0){
                 time_to_eat = 0;
@@ -74,31 +75,33 @@ void EatOrThink(int i, pid_t pid){
                 i, time_to_eat, time_eating);
             sleep(time_to_eat);
             time_eating += time_to_eat;
-
+            semop(chopsticks, drop, 2);
         }
-
     }
-
-    //sem_post(sem_t *sem) ==> unlocks the semaphore
-    //sem_wait(sem_t *sem) ==> locks the sempaphore
-
-
+    printf("Philosopher %i ate for a total of %i seconds and thought for %i seconds\n", i, time_eating, time_thinking);
 }
 
 void philo(){
 
     pid_t pid[NUM_PHILO];
-
-    for(int i=0; i<NUM_PHILO;i++){
-        if((chopsticks[i] = semget(IPC_PRIVATE, 1, S_IRUSR | S_IWUSR)) != 0){
-
-        }
-        
+   
+    chopsticks = semget(IPC_PRIVATE, NUM_PHILO, IPC_CREAT | 0666);
+    for(int i=0; i< NUM_PHILO; i++){
+        semctl(chopsticks, i, SETVAL, 1);  //Go through and set the valud of the chopstick to 1
     }
+    /*for(int i=0; i<NUM_PHILO;i++){
+        if((chopsticks[i] = semget(IPC_PRIVATE, 1, S_IRUSR | S_IWUSR)) < 0){
+            fprintf(stderr, "Error: semget() failed\n");
+            exit(1);
+        }
+        printf("SemID[%i]: %d \n", i, chopsticks[i]);
+
+        
+    }*/
 
     for (int i = 0; i < NUM_PHILO; ++i){
         pid_t childID = fork();
-        //printf("Forked Philosopher %i (process %d)\n", i, childID);
+        printf("Forked Philosopher %i (process %d)\n", i, childID);
         pid[i] = childID;
         if (pid[i] < 0){
             printf("Error\n");
